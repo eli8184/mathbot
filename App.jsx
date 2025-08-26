@@ -9,8 +9,8 @@ import "katex/dist/katex.min.css";
 // Simple helper to render LaTeX between \( and \) as InlineMath
 function renderMessageContent(content) {
   if (!content) return null;
-  // Match anything (including spaces, backslashes, etc.) between \( and \) or \[ and \]
-  const regex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\])/g;
+  // Match anything between \( ... \), \[ ... \], $$ ... $$, or $ ... $
+  const regex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g;
   const parts = content.split(regex);
   return parts.map((part, i) => {
     if (part.startsWith('\\(') && part.endsWith('\\)')) {
@@ -19,6 +19,12 @@ function renderMessageContent(content) {
     } else if (part.startsWith('\\[') && part.endsWith('\\]')) {
       // Brackets indicate block math
       return <BlockMath key={i}>{part.slice(2, -2)}</BlockMath>;
+    } else if (part.startsWith('$$') && part.endsWith('$$')) {
+      // Double dollar signs indicate block math
+      return <BlockMath key={i}>{part.slice(2, -2)}</BlockMath>;
+    } else if (part.startsWith('$') && part.endsWith('$')) {
+      // Single dollar signs indicate inline math
+      return <InlineMath key={i}>{part.slice(1, -1)}</InlineMath>;
     } else {
       // Normal text
       return <span key={i}>{part}</span>;
@@ -277,3 +283,4 @@ function App() {
 }
 
 export default App;
+
