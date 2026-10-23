@@ -5,9 +5,12 @@ import cors from "cors";
 import fs from "fs";
 
 dotenv.config();
+// use Gemini through its OpenAI-compatible endpoint
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: process.env.GEMINI_API_KEY,
+  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
 });
+const model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 
 // set up express server
 const app = express();
@@ -39,9 +42,9 @@ app.post("/chat", async (req, res) => {
   res.setHeader("Connection", "keep-alive");
 
   try {
-    // connect to OpenAI API and stream the response
+    // connect to Gemini API and stream the response
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model,
       messages,
       stream: true,
     });
