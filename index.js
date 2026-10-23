@@ -16,25 +16,34 @@ const model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 const app = express();
 app.use(cors());
 app.use(express.json());
+// serve the built React frontend (created by `npm run build`)
+app.use(express.static("dist"));
 
 // set up the chatbot
-const messages = [
-  {
-    role: "system",
-    content:
-      "You are a math teacher. You will answer questions about math and provide explanations. Don't explicity give the answer, but use socratic questioning to guide the user to the answer. Output math in LaTex format. Make sure you're not missing any brackets or parenthesis in you LaTeX output.",
-  },
-];
+const systemPrompt = {
+  role: "system",
+  content:
+    "You are a math teacher. You will answer questions about math and provide explanations. Don't explicity give the answer, but use socratic questioning to guide the user to the answer. Output math in LaTex format. Make sure you're not missing any brackets or parenthesis in you LaTeX output.",
+};
+// only send the most recent messages to keep requests small
+const MAX_HISTORY = 20;
 
 // set up post to handle chat messages
+// each browser sends its own chat history, so users don't share a conversation
 app.post("/chat", async (req, res) => {
-  const userInput = req.body.message;
-  // check if userInput is provided
-  if (!userInput) {
+  const history = req.body.messages;
+  // check if a conversation is provided
+  if (!Array.isArray(history) || history.length === 0) {
     return res.status(400).json({ error: "No input provided." });
   }
-  // add user input to messages
-  messages.push({ role: "user", content: userInput });
+  // keep only valid user/assistant messages
+  const messages = [
+    systemPrompt,
+    ...history
+      .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+      .slice(-MAX_HISTORY)
+      .map((m) => ({ role: m.role, content: m.content })),
+  ];
 
   // set up headers for message streaming
   res.setHeader("Content-Type", "text/event-stream");
@@ -48,26 +57,23 @@ app.post("/chat", async (req, res) => {
       messages,
       stream: true,
     });
-    // process the streamed response
-    let assistantResponse = "";
     // the response is streamed in parts
-    // we will concatenate the parts to form the complete response
+    // each part is JSON-encoded so newlines in the text don't break the stream
     for await (const part of completion) {
       const content = part.choices[0]?.delta?.content;
       if (content) {
-        assistantResponse += content;
-        res.write(`data: ${content}\n\n`);
+        res.write(`data: ${JSON.stringify(content)}\n\n`);
       }
     }
 
-    messages.push({ role: "assistant", content: assistantResponse });
     // finishes sending the response
     res.write(`data: [DONE]\n\n`);
     res.end();
     // in case of an error, send an error message
   } catch (error) {
     console.error("Error generating response:", error);
-    res.write(`data: Error generating response\n\n`);
+    res.write(`data: ${JSON.stringify("Error generating response")}\n\n`);
+    res.write(`data: [DONE]\n\n`);
     res.end();
   }
 });
@@ -75,15 +81,15 @@ app.post("/chat", async (req, res) => {
 // set up post to handle feedback
 app.post("/feedback", (req, res) => {
   // type = "positive" or "negative"
-  // msg = feedback message
+  // message = feedback message
   // timestamp = current time in ISO format
-  const { type, msg } = req.body;
+  const { type, message } = req.body;
   const feedbackData = {
     type: type,
-    feedback: msg,
+    feedback: message,
     timestamp: new Date().toISOString(),
   };
-  
+
   // read the existing feedback file or create a new one if it doesn't exist
   fs.readFile("feedback.json", "utf8", (err, data) => {
     let feedbackList = [];
@@ -109,22 +115,8 @@ app.post("/feedback", (req, res) => {
   });
 });
 
-// Helper to reset messages to just the system prompt
-function resetMessages() {
-  messages.length = 0;
-  messages.push({
-    role: "system",
-    content:
-      "You are a math teacher. You will answer questions about math and provide explanations. Don't explicity give the answer, but use socratic questioning to guide the user to the answer. Output math in LaTex format. Make sure you're not missing any brackets or parenthesis in you LaTeX output.",
-  });
-}
-// Endpoint to clear chat history on the server
-app.post("/clear-history", (req, res) => {
-  resetMessages();
-  res.status(200).json({ message: "History cleared." });
-});
-
-// listener for requests on port 3001
-app.listen(3001, () => {
-  console.log("Server running at http://localhost:3001");
+// listener for requests (Render sets PORT; locally it's 3001)
+const port = process.env.PORT || 3001;
+app.listen(port, () => {
+  console.log(`Server running at http://localhost:${port}`);
 });

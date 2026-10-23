@@ -66,13 +66,7 @@ function App() {
 
   // clear messages state and local storage
   const clearHistory = async () => {
-    // Clear server-side history
-    try {
-      await fetch("http://localhost:3001/clear-history", { method: "POST" });
-    } catch (e) {
-      // Optionally handle error
-      console.error("Failed to clear server history", e);
-    }
+    // the server doesn't store history, so clearing it here is enough
     setMessages([]);
     localStorage.removeItem("messages");
     setInput("");
@@ -100,19 +94,21 @@ function App() {
     try {
       // make a POST request to the server with the user input
       // set headers for JSON content type
-      const response = await fetch("http://localhost:3001/chat", {
+      const response = await fetch("/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        // send the user input as JSON in the request body
-        body: JSON.stringify({ message: input }),
+        // send the whole conversation so the server knows the context
+        body: JSON.stringify({ messages: newMessages }),
       });
 
       // reads and decodes the response body as a stream in chunks
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
       let assistantResponse = "";
+      // holds a partial event when a chunk ends in the middle of one
+      let buffer = "";
       // function to process the streamed response
       const streamAssistantResponse = async () => {
         while (true) {
@@ -120,21 +116,23 @@ function App() {
           // if done, break the loop
           const { done, value } = await reader.read();
           if (done) break;
-          // decode the chunk and split it into lines
-          const chunk = decoder.decode(value);
-          const lines = chunk.split("\n\n");
+          // decode the chunk and split it into events
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n\n");
+          // the last piece may be incomplete, so keep it for the next chunk
+          buffer = lines.pop();
           // loads each line and checks if it starts with "data: " (format used by server-sent events)
           for (let line of lines) {
             if (line.startsWith("data: ")) {
               // remove the "data: " prefix so it's just the content
               // if the data is "[DONE]", set loading to false and return (since [DONE] indicates the end of the response)
-              const data = line.replace("data: ", "");
+              const data = line.slice("data: ".length);
               if (data === "[DONE]") {
                 setLoading(false);
                 return;
               }
-              // concatenate the data to the assistant response
-              assistantResponse += data;
+              // the server JSON-encodes each part, so decode it and add it to the response
+              assistantResponse += JSON.parse(data);
               // update the messages state with the new assistant response, which re-renders the UI
               setMessages([...newMessages, { role: "assistant", content: assistantResponse }]);
             }
@@ -158,7 +156,7 @@ function App() {
   const handleFeedback = async (type, msg) => {
     try {
       // make a POST request to the server with the feedback data
-        await fetch("http://localhost:3001/feedback", {
+        await fetch("/feedback", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

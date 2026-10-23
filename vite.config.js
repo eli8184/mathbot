@@ -9,5 +9,10 @@ export default defineConfig({
   },
   server: {
     open: true,
+    // in development, forward API calls to the Express server
+    proxy: {
+      '/chat': 'http://localhost:3001',
+      '/feedback': 'http://localhost:3001',
+    },
   },
 });
