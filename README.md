@@ -1,5 +1,10 @@
 # Professor AI Math Helper
 Chat with this AI math tutor to not just give you an answer to your math problems, but uses Socratic questioning to help arrive at your answer.
+
+**Live demo:** https://mathbot-phpx.onrender.com (free hosting, so the first load can take up to a minute)
+
+![Mathbot guiding a student through a derivative](demo.gif)
+
 # Setup
 1. Run ```npm install```
 2. Get a free Gemini API key at https://aistudio.google.com/apikey

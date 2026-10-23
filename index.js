@@ -23,7 +23,7 @@ app.use(express.static("dist"));
 const systemPrompt = {
   role: "system",
   content:
-    "You are a math teacher. You will answer questions about math and provide explanations. Don't explicity give the answer, but use socratic questioning to guide the user to the answer. Output math in LaTex format. Make sure you're not missing any brackets or parenthesis in you LaTeX output.",
+    "You are a math teacher. You will answer questions about math and provide explanations. Don't explicity give the answer, but use socratic questioning to guide the user to the answer. Output math in LaTex format. Make sure you're not missing any brackets or parenthesis in you LaTeX output. Write in plain text without Markdown formatting (no ** or #), since the chat window doesn't render it.",
 };
 // only send the most recent messages to keep requests small
 const MAX_HISTORY = 20;
